@@ -31,8 +31,8 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-#define EXAMPLE_1
-//#define EXAMPLE_2
+//#define EXAMPLE_1
+#define EXAMPLE_2
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -102,6 +102,8 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 	txData[0] = anglesByte0[idx];
 	txData[1] = anglesByte1[idx];
 
+	txHeader.DataLength = FDCAN_DLC_BYTES_2;
+
 	HAL_FDCAN_AddMessageToTxFifoQ(&hfdcan1, &txHeader, txData);
 }
 
@@ -166,13 +168,6 @@ int main(void)
   txHeader.Identifier = 0x13;
   txHeader.IdType = FDCAN_STANDARD_ID;
   txHeader.TxFrameType = FDCAN_DATA_FRAME;
-#ifdef EXAMPLE_1
-  txHeader.DataLength = FDCAN_DLC_BYTES_2;
-#elif defined(EXAMPLE_2)
-  txHeader.DataLength = FDCAN_DLC_BYTES_1;
-#else
-  txHeader.DataLength = FDCAN_DLC_BYTES_2;
-#endif
   txHeader.ErrorStateIndicator = FDCAN_ESI_ACTIVE;
   txHeader.BitRateSwitch = FDCAN_BRS_OFF;
   txHeader.FDFormat = FDCAN_CLASSIC_CAN;
@@ -185,31 +180,33 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-//#ifdef EXAMPLE_1
-////	  Example 1
-//	for (uint8_t j = 0; j < 4; j++)
-//	{
-//		for(uint8_t i = 0x10; i <= 0x13; i++)
-//		{
-//			txHeader.Identifier = i;
-//			txData[0] = anglesByte0[j];
-//			txData[1] = anglesByte1[j];
-//
-//			HAL_FDCAN_AddMessageToTxFifoQ(&hfdcan1, &txHeader, txData);
-//
-//			HAL_Delay(500);
-//		}
-//	}
-//#endif
+#ifdef EXAMPLE_1
+//	  Example 1
+	for (uint8_t j = 0; j < 4; j++)
+	{
+		for(uint8_t i = 0x10; i <= 0x13; i++)
+		{
+			txHeader.Identifier = i;
+			txData[0] = anglesByte0[j];
+			txData[1] = anglesByte1[j];
+
+			txHeader.DataLength = FDCAN_DLC_BYTES_2;
+			HAL_FDCAN_AddMessageToTxFifoQ(&hfdcan1, &txHeader, txData);
+
+			HAL_Delay(500);
+		}
+	}
+#endif
 
 #ifdef EXAMPLE_2
 //	  Example 2
 	for(uint8_t i = 3; i <= 8; i++)
 	{
 		txData[0] = i;
+		txHeader.DataLength = FDCAN_DLC_BYTES_1;
 		HAL_FDCAN_AddMessageToTxFifoQ(&hfdcan1, &txHeader, txData);
 
-		HAL_Delay(5000);
+		HAL_Delay(10000);
 	}
 #endif
     /* USER CODE END WHILE */
