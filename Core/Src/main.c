@@ -31,8 +31,8 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-//#define EXAMPLE_1
-#define EXAMPLE_2
+#define EXAMPLE_1
+//#define EXAMPLE_2
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -44,6 +44,8 @@
 FDCAN_HandleTypeDef hfdcan1;
 
 UART_HandleTypeDef hlpuart1;
+
+TIM_HandleTypeDef htim6;
 
 /* USER CODE BEGIN PV */
 FDCAN_TxHeaderTypeDef txHeader;
@@ -63,6 +65,7 @@ void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_LPUART1_UART_Init(void);
 static void MX_FDCAN1_Init(void);
+static void MX_TIM6_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -71,16 +74,48 @@ static void MX_FDCAN1_Init(void);
 /* USER CODE BEGIN 0 */
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 {
-  if((GPIO_Pin == GPIO_PIN_13) || (GPIO_Pin == GPIO_PIN_5))
-  {
-    txData[0] = anglesByte0[idx];
-    txData[1] = anglesByte1[idx];
+	// Disable button interrupts
+	HAL_NVIC_DisableIRQ(EXTI4_IRQn);
+	HAL_NVIC_DisableIRQ(EXTI9_5_IRQn);
+	HAL_NVIC_DisableIRQ(EXTI15_10_IRQn);
 
-    idx++;
-    idx %= 4;
+	// Start debounce timer
+	HAL_TIM_Base_Start_IT(&htim6);
 
-    HAL_FDCAN_AddMessageToTxFifoQ(&hfdcan1, &txHeader, txData);
-  }
+	switch(GPIO_Pin)
+	{
+		case BTN_SERVO_ANGLE_DOWN_Pin:
+			idx = (idx == 0) ? 3 : idx - 1;
+			break;
+		case BTN_SERVO_ANGLE_UP_Pin:
+			idx++;
+			idx %= 4;
+			break;
+		case BTN_SERVO_ID_DOWN_Pin:
+			txHeader.Identifier = (txHeader.Identifier <= 0x10) ? 0x13 : txHeader.Identifier - 1;
+			break;
+		case BTN_SERVO_ID_UP_Pin:
+			txHeader.Identifier = (txHeader.Identifier >= 0x13) ? 0x10 : txHeader.Identifier + 1;
+			break;
+	}
+
+	txData[0] = anglesByte0[idx];
+	txData[1] = anglesByte1[idx];
+
+	HAL_FDCAN_AddMessageToTxFifoQ(&hfdcan1, &txHeader, txData);
+}
+
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef* htim)
+{
+	if(htim == &htim6)
+	{
+		// Re-enable button interrupts after debounce period
+		HAL_NVIC_EnableIRQ(EXTI4_IRQn);
+		HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
+		HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
+
+		HAL_TIM_Base_Stop_IT(&htim6);
+	}
 }
 
 /* USER CODE END 0 */
@@ -115,6 +150,7 @@ int main(void)
   MX_GPIO_Init();
   MX_LPUART1_UART_Init();
   MX_FDCAN1_Init();
+  MX_TIM6_Init();
   /* USER CODE BEGIN 2 */
 
   if(HAL_FDCAN_Start(&hfdcan1) != HAL_OK)
@@ -149,22 +185,22 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-#ifdef EXAMPLE_1
-//	  Example 1
-	for (uint8_t j = 0; j < 4; j++)
-	{
-		for(uint8_t i = 0x10; i <= 0x13; i++)
-		{
-			txHeader.Identifier = i;
-			txData[0] = anglesByte0[j];
-			txData[1] = anglesByte1[j];
-
-			HAL_FDCAN_AddMessageToTxFifoQ(&hfdcan1, &txHeader, txData);
-
-			HAL_Delay(500);
-		}
-	}
-#endif
+//#ifdef EXAMPLE_1
+////	  Example 1
+//	for (uint8_t j = 0; j < 4; j++)
+//	{
+//		for(uint8_t i = 0x10; i <= 0x13; i++)
+//		{
+//			txHeader.Identifier = i;
+//			txData[0] = anglesByte0[j];
+//			txData[1] = anglesByte1[j];
+//
+//			HAL_FDCAN_AddMessageToTxFifoQ(&hfdcan1, &txHeader, txData);
+//
+//			HAL_Delay(500);
+//		}
+//	}
+//#endif
 
 #ifdef EXAMPLE_2
 //	  Example 2
@@ -321,6 +357,44 @@ static void MX_LPUART1_UART_Init(void)
 }
 
 /**
+  * @brief TIM6 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM6_Init(void)
+{
+
+  /* USER CODE BEGIN TIM6_Init 0 */
+
+  /* USER CODE END TIM6_Init 0 */
+
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+
+  /* USER CODE BEGIN TIM6_Init 1 */
+
+  /* USER CODE END TIM6_Init 1 */
+  htim6.Instance = TIM6;
+  htim6.Init.Prescaler = 170-1;
+  htim6.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim6.Init.Period = 9999;
+  htim6.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim6) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim6, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM6_Init 2 */
+
+  /* USER CODE END TIM6_Init 2 */
+
+}
+
+/**
   * @brief GPIO Initialization Function
   * @param None
   * @retval None
@@ -353,13 +427,22 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(LD2_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pin : PB5 */
-  GPIO_InitStruct.Pin = GPIO_PIN_5;
+  /*Configure GPIO pins : BTN_SERVO_ID_UP_Pin BTN_SERVO_ID_DOWN_Pin */
+  GPIO_InitStruct.Pin = BTN_SERVO_ID_UP_Pin|BTN_SERVO_ID_DOWN_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_IT_FALLING;
+  GPIO_InitStruct.Pull = GPIO_PULLUP;
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : BTN_SERVO_ANGLE_DOWN_Pin BTN_SERVO_ANGLE_UP_Pin */
+  GPIO_InitStruct.Pin = BTN_SERVO_ANGLE_DOWN_Pin|BTN_SERVO_ANGLE_UP_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_IT_FALLING;
   GPIO_InitStruct.Pull = GPIO_PULLUP;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
   /* EXTI interrupt init*/
+  HAL_NVIC_SetPriority(EXTI4_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(EXTI4_IRQn);
+
   HAL_NVIC_SetPriority(EXTI9_5_IRQn, 0, 0);
   HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
 
