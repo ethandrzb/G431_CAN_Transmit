@@ -66,6 +66,8 @@ void Error_Handler(void);
 #define LPUART1_RX_GPIO_Port GPIOA
 #define LD2_Pin GPIO_PIN_5
 #define LD2_GPIO_Port GPIOA
+#define CAN_HEARTBEAT_LED_Pin GPIO_PIN_6
+#define CAN_HEARTBEAT_LED_GPIO_Port GPIOA
 #define BTN_SERVO_ID_UP_Pin GPIO_PIN_8
 #define BTN_SERVO_ID_UP_GPIO_Port GPIOA
 #define BTN_SERVO_ID_UP_EXTI_IRQn EXTI9_5_IRQn

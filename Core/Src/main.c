@@ -32,7 +32,8 @@
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
 //#define EXAMPLE_1
-#define EXAMPLE_2
+//#define EXAMPLE_2
+#define HEARTBEAT_EXAMPLE
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -53,7 +54,7 @@ FDCAN_RxHeaderTypeDef rxHeader;
 uint8_t txData[8];
 uint8_t rxData[8];
 
-uint8_t dataOK = 0;
+uint8_t expectedHeartbeatData = 0;
 
 uint8_t idx = 0;
 const uint8_t anglesByte0[4] = {0x0, 0x0, 0x0, 0x1};
@@ -102,6 +103,7 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 	txData[0] = anglesByte0[idx];
 	txData[1] = anglesByte1[idx];
 
+	txHeader.TxFrameType = FDCAN_DATA_FRAME;
 	txHeader.DataLength = FDCAN_DLC_BYTES_2;
 
 	HAL_FDCAN_AddMessageToTxFifoQ(&hfdcan1, &txHeader, txData);
@@ -121,7 +123,33 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef* htim)
 		HAL_TIM_Base_Stop_IT(&htim6);
 	}
 }
+void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
+{
+	// Check for new messages
+	if((RxFifo0ITs & FDCAN_IT_RX_FIFO0_NEW_MESSAGE) != RESET)
+	{
+		// Retrieve message
+		if(HAL_FDCAN_GetRxMessage(hfdcan, FDCAN_RX_FIFO0, &rxHeader, rxData) != HAL_OK)
+		{
+			Error_Handler();
+		}
 
+		// Check header length
+		// Will likely need to be converted to a switch statement as more commands are implemented
+		if((rxHeader.DataLength == FDCAN_DLC_BYTES_1) && (rxData[0] == expectedHeartbeatData))
+		{
+			// Heart beat received if data matches expected value
+			HAL_GPIO_TogglePin(CAN_HEARTBEAT_LED_GPIO_Port, CAN_HEARTBEAT_LED_Pin);
+		}
+
+		// Re-activate message notifications
+		// HAL disables them when a message is received, so they need to be reactivated after every message
+		if(HAL_FDCAN_ActivateNotification(hfdcan, FDCAN_IT_RX_FIFO0_NEW_MESSAGE, 0) != HAL_OK)
+		{
+			Error_Handler();
+		}
+	}
+}
 /* USER CODE END 0 */
 
 /**
@@ -167,7 +195,7 @@ int main(void)
 	  Error_Handler();
   }
 
-  txHeader.Identifier = 0x13;
+  txHeader.Identifier = 0x10;
   txHeader.IdType = FDCAN_STANDARD_ID;
   txHeader.TxFrameType = FDCAN_DATA_FRAME;
   txHeader.ErrorStateIndicator = FDCAN_ESI_ACTIVE;
@@ -214,6 +242,21 @@ int main(void)
 
 		HAL_Delay(10000);
 	}
+#endif
+
+#ifdef HEARTBEAT_EXAMPLE
+	// Store expected response for comparison in RxFifo0Callback
+	// Expected value should be the CAN ID of the node you want to check
+	expectedHeartbeatData = 0x10;
+
+	txHeader.DataLength = FDCAN_DLC_BYTES_1;
+	txHeader.TxFrameType = FDCAN_REMOTE_FRAME;
+
+	HAL_FDCAN_AddMessageToTxFifoQ(&hfdcan1, &txHeader, txData);
+
+	HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
+
+	HAL_Delay(1000);
 #endif
     /* USER CODE END WHILE */
 
@@ -415,7 +458,7 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOA, LD2_Pin|CAN_HEARTBEAT_LED_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin : B1_Pin */
   GPIO_InitStruct.Pin = B1_Pin;
@@ -423,12 +466,12 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(B1_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pin : LD2_Pin */
-  GPIO_InitStruct.Pin = LD2_Pin;
+  /*Configure GPIO pins : LD2_Pin CAN_HEARTBEAT_LED_Pin */
+  GPIO_InitStruct.Pin = LD2_Pin|CAN_HEARTBEAT_LED_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(LD2_GPIO_Port, &GPIO_InitStruct);
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
   /*Configure GPIO pins : BTN_SERVO_ID_UP_Pin BTN_SERVO_ID_DOWN_Pin */
   GPIO_InitStruct.Pin = BTN_SERVO_ID_UP_Pin|BTN_SERVO_ID_DOWN_Pin;
