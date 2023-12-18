@@ -105,6 +105,8 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 	txHeader.DataLength = FDCAN_DLC_BYTES_2;
 
 	HAL_FDCAN_AddMessageToTxFifoQ(&hfdcan1, &txHeader, txData);
+
+	HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
 }
 
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef* htim)
@@ -193,6 +195,8 @@ int main(void)
 			txHeader.DataLength = FDCAN_DLC_BYTES_2;
 			HAL_FDCAN_AddMessageToTxFifoQ(&hfdcan1, &txHeader, txData);
 
+			HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
+
 			HAL_Delay(500);
 		}
 	}
@@ -205,6 +209,8 @@ int main(void)
 		txData[0] = i;
 		txHeader.DataLength = FDCAN_DLC_BYTES_1;
 		HAL_FDCAN_AddMessageToTxFifoQ(&hfdcan1, &txHeader, txData);
+
+		HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
 
 		HAL_Delay(10000);
 	}
